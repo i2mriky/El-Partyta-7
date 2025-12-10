@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html dir="rtl" lang="ar">
 <head>
-<link rel="apple-touch-icon" href="/party-icon.png">
-	<meta charset="UTF-8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>لعبة القعدة</title>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
@@ -309,6 +308,13 @@
                 gain.gain.setValueAtTime(0.05, now);
                 osc.start(now);
                 osc.stop(now + 0.03);
+            } else if (type === 'success') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(440, now);
+                osc.frequency.exponentialRampToValueAtTime(880, now + 0.1);
+                gain.gain.setValueAtTime(0.1, now);
+                osc.start(now);
+                osc.stop(now + 0.3);
             }
         }
 
@@ -385,6 +391,7 @@
         }
 
         function renderHome() {
+            // FIXED: Removed 'justify-center' so items start from the top and don't get cut off
             return `
                 <div class="flex flex-col items-center justify-center h-screen p-6 space-y-6">
                     <div class="text-center space-y-2 pt-10">
@@ -395,7 +402,7 @@
                         <p class="text-lg text-slate-500 font-medium">اللمة متحلاش غير بيها</p>
                     </div>
 
-                    <div class="w-full space-y-3 flex-1 flex flex-col justify-center overflow-y-auto pb-4">
+                    <div class="w-full space-y-3 flex-1 flex flex-col overflow-y-auto pb-4">
                         ${menuButton('five_second_setup', '⏱️', 'خمسة عليك', 'سؤال بـ 5 ثواني', 'bg-teal-600')}
                         ${menuButton('spy_setup', '🕵️', 'الجاسوس', 'مين الغريب وسطنا؟', 'bg-indigo-600')}
                         ${menuButton('charades_setup', '🎭', 'بدون كلام', 'تمثيل.. فردي أو فرق', 'bg-rose-600')}
@@ -1779,11 +1786,4 @@
         render();
     </script>
 </body>
-</html>1, now);
-                osc.start(now);
-                osc.stop(now + 0.05);
-            } else if (type === 'success') {
-                osc.type = 'triangle';
-                osc.frequency.setValueAtTime(440, now);
-                osc.frequency.exponentialRampToValueAtTime(880, now + 0.1);
-                gain.gain.setValueAtTime(0.
+</html>
