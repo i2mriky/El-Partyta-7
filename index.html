@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>لعبة القعدة V50</title>
+    <title>لعبة القعدة - النسخة الأصلية</title>
     
     <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json">
@@ -740,7 +740,19 @@
         // ===== HELPERS =====
         function toggleMute() {
             state.isMuted = !state.isMuted;
-            document.getElementById('muteBtn').innerHTML = state.isMuted ? '<svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="19" y2="19"></line></svg>' : '<svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon></svg>';
+            const btn = document.getElementById('muteBtn');
+            
+            if (state.isMuted) {
+                // Muted: Red background with X icon
+                btn.className = 'p-2 bg-red-100 rounded-full shadow-md text-red-500 hover:bg-red-200 transition';
+                btn.innerHTML = '<svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>';
+            } else {
+                // Unmuted: Normal style with speaker icon
+                btn.className = 'p-2 bg-white rounded-full shadow-md text-slate-600 hover:bg-slate-50 transition';
+                btn.innerHTML = '<svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>';
+            }
+            
+            saveState();
             playSound('click');
         }
         function goHome() { 
@@ -753,6 +765,11 @@
         // Navigate with instant snappy transition
         function navigate(screen) { 
             playSound('click'); 
+            // ⚠️ CRITICAL: Stop any running game timers immediately
+            if (gameInterval) {
+                clearInterval(gameInterval);
+                gameInterval = null;
+            }
             state.screen = screen; 
             render(); // Immediate render with entry animation
         }
@@ -831,8 +848,19 @@
                 const inTeamA = teamA.members.some(m => m.id === id);
                 const inTeamB = teamB.members.some(m => m.id === id);
 
-                if (inTeamA) teamA.score += points;
-                else if (inTeamB) teamB.score += points;
+                if (inTeamA) {
+                    teamA.score += points;
+                    // Team milestone animations
+                    if (teamA.score % 5 === 0) {
+                        createConfetti();
+                    }
+                } else if (inTeamB) {
+                    teamB.score += points;
+                    // Team milestone animations
+                    if (teamB.score % 5 === 0) {
+                        createConfetti();
+                    }
+                }
             }
 
             playSound('success');
@@ -1051,7 +1079,7 @@
                     </div>
                     
                     <!-- Player Input Section -->
-                    <form onsubmit="addPlayer(event)" class="flex gap-3 mb-6 h-14">
+                    <form onsubmit="addPlayer(event)" class="flex items-stretch gap-3 mb-6 h-14">
                         <button type="submit" class="bg-amber-500 text-white h-full w-14 rounded-2xl font-bold flex items-center justify-center shadow-lg hover:bg-amber-600 active:scale-95 transition">
                             <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
                                 <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -1120,12 +1148,72 @@
                 </div>
             `;
         }
+        function shareResults() {
+            let shareText = '🔥 ملوك القعدة وصلوا.. وسع للنتايج!\n\n🏆 الترتيب الحالي:\n';
+            
+            if (state.teamMode) {
+                const sortedTeams = [...state.teams].sort((a, b) => b.score - a.score);
+                sortedTeams.forEach((t, i) => {
+                    const emoji = i === 0 ? '1️⃣' : i === 1 ? '2️⃣' : '3️⃣';
+                    shareText += `${emoji} ${t.name}: ${t.score} نقطة\n`;
+                });
+            } else {
+                const sortedPlayers = [...state.players].sort((a, b) => b.score - a.score);
+                sortedPlayers.slice(0, 5).forEach((p, i) => {
+                    const emoji = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣'][i];
+                    shareText += `${emoji} ${p.name}: ${p.score} نقطة\n`;
+                });
+            }
+            
+            shareText += '\n🎲 العبها معانا دلوقتي: [رابط التطبيق]';
+            
+            // Try Web Share API first (mobile)
+            if (navigator.share) {
+                navigator.share({
+                    title: 'لعبة القعدة - النتائج',
+                    text: shareText
+                }).catch(() => {
+                    // If share cancelled or failed, fallback to clipboard
+                    copyToClipboard(shareText);
+                });
+            } else {
+                // Fallback: Copy to clipboard
+                copyToClipboard(shareText);
+            }
+        }
+        
+        function copyToClipboard(text) {
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(text).then(() => {
+                    alert('✅ تم النسخ! الصقها في أي محادثة');
+                    playSound('success');
+                });
+            } else {
+                // Older fallback
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                alert('✅ تم النسخ! الصقها في أي محادثة');
+                playSound('success');
+            }
+        }
+        
         function renderScores() {
             if (state.teamMode) {
                 const sortedTeams = [...state.teams].sort((a, b) => b.score - a.score);
                 return `
                     <div class="p-6 h-screen flex flex-col">
                         ${header('لوحة الشرف - الفرق', 'home')}
+                        
+                        <!-- Share Button -->
+                        <button onclick="shareResults()" class="w-full py-3 mb-4 bg-indigo-600 text-white rounded-xl font-bold shadow-lg hover:bg-indigo-700 transition flex items-center justify-center gap-2">
+                            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+                            <span>شارك النتائج</span>
+                        </button>
+                        
                         <div class="flex-1 overflow-y-auto space-y-4">
                             ${sortedTeams.map((t, i) => `
                                 <div class="flex items-center p-4 rounded-xl shadow-sm border border-slate-100 bg-white">
@@ -1146,6 +1234,13 @@
                 return `
                     <div class="p-6 h-screen flex flex-col">
                         ${header('لوحة الشرف', 'home')}
+                        
+                        <!-- Share Button -->
+                        <button onclick="shareResults()" class="w-full py-3 mb-4 bg-indigo-600 text-white rounded-xl font-bold shadow-lg hover:bg-indigo-700 transition flex items-center justify-center gap-2">
+                            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+                            <span>شارك النتائج</span>
+                        </button>
+                        
                         <div class="flex-1 overflow-y-auto space-y-4">
                             ${sortedPlayers.map((p, i) => `
                                 <div class="flex items-center p-4 rounded-xl shadow-sm border border-slate-100 bg-white">
@@ -1155,7 +1250,7 @@
                                 </div>
                             `).join('')}
                         </div>
-                        <button onclick="resetScores()" class="mt-4 w-full py-4 bg-slate-800 text-white rounded-xl font-bold">تصفير العداد</button>
+                        <button onclick="resetScores()" class="mt-4 w-full py-4 bg-red-600 text-white rounded-xl font-bold border-2 border-red-700 hover:bg-red-700 transition">⚠️ تصفير العداد</button>
                     </div>
                 `;
             }
@@ -1210,8 +1305,12 @@
             render();
         }
         function resetScores() { 
+            // Confirmation dialog for safety
+            if (!confirm('هل أنت متأكد من تصفير العداد لجميع اللاعبين؟')) return;
+            
             state.players = state.players.map(p => ({...p, score: 0}));
             state.teams = state.teams.map(t => ({...t, score: 0}));
+            playSound('click');
             saveState();
             render(); 
         }
@@ -1332,7 +1431,13 @@
             }, 1000);
         }
         function indianSuccess() { updateScore(state.currentGame.player.id, false, 1); startIndianGame(); }
-        function indianFail() { state.currentGame.phase = 'result'; render(); }
+        function indianFail() { 
+            if (gameInterval) clearInterval(gameInterval);
+            state.currentGame.phase = 'result'; 
+            playSound('fail');
+            saveState();
+            render(); 
+        }
         function renderIndianSetup() {
             if (!state.currentGame || state.currentGame.type !== 'indian') return renderGameStartScreen('سيناريو هندي', 'مثل مشهد درامي مع شرط إخراج غريب! أوفر على قد ما تقدر!', '🎬', 'أكشن!', 'startIndianGame()', 'bg-orange-600');
             const game = state.currentGame;
@@ -2176,11 +2281,26 @@
         function nextLikelyRound() { startLikelyGame(); }
         function renderLikelySetup() { if (!state.currentGame || state.currentGame.type !== 'likely') return renderGameStartScreen('مين الكارثة؟', 'سؤال يظهر. في ٥ ثواني كلكم تشاوروا على نفس الشخص. اللي الكل شاور عليه.. عقاب!', '👉', 'ابدأ اللعبة', 'startLikelyGame()', 'bg-red-600'); const game = state.currentGame; if (game.phase === 'ready') return `<div class="h-screen flex flex-col items-center justify-center p-6 bg-red-600 text-white text-center animate-in"><div class="text-6xl mb-6">👉</div><h2 class="text-3xl font-bold mb-8">جاهزين؟</h2><div onclick="startLikelyTimerNow()" class="w-full py-6 bg-white text-red-700 rounded-2xl font-black text-2xl shadow-xl cursor-pointer hover:bg-red-50 transition">دوس عشان تشوف السؤال<br><span class="text-sm font-normal text-slate-500">(5 ثواني بس!)</span></div></div>`; if (game.phase === 'showing') return `<div class="h-screen flex flex-col items-center justify-center p-6 bg-red-600 text-white text-center"><div class="bg-white/20 p-8 rounded-3xl mb-8 w-full"><h1 class="text-3xl font-black leading-relaxed">${game.question}</h1></div><div class="text-8xl font-black mb-8" id="game-timer">${game.timeLeft}</div><p class="text-xl opacity-90">شاوروا دلوقتي! 👉</p></div>`; if (game.phase === 'result') return `<div class="h-screen flex flex-col items-center justify-center p-6 bg-red-900 text-white text-center"><div class="bg-white/10 p-6 rounded-2xl mb-6 w-full"><h3 class="text-sm opacity-75 mb-2">السؤال كان:</h3><h1 class="text-2xl font-black leading-relaxed">${game.question}</h1></div><h2 class="text-3xl font-bold mb-8">اتفقوا على مين؟</h2><div class="grid grid-cols-2 gap-3 w-full mb-8">${state.players.map(p => `<button onclick="likelySelectPlayer(${p.id})" class="p-4 bg-white/20 rounded-xl font-bold hover:bg-white/30">${p.name}</button>`).join('')}</div><button onclick="nextLikelyRound()" class="w-full py-3 bg-red-500 rounded-xl font-bold">جولة جديدة</button><button onclick="goHome()" class="w-full py-3 bg-slate-700 rounded-xl font-bold mt-3">خروج</button></div>`; }
 
+        // Update mute button appearance based on state
+        function updateMuteButton() {
+            const btn = document.getElementById('muteBtn');
+            if (btn) {
+                if (state.isMuted) {
+                    btn.className = 'p-2 bg-red-100 rounded-full shadow-md text-red-500 hover:bg-red-200 transition';
+                    btn.innerHTML = '<svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>';
+                } else {
+                    btn.className = 'p-2 bg-white rounded-full shadow-md text-slate-600 hover:bg-slate-50 transition';
+                    btn.innerHTML = '<svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>';
+                }
+            }
+        }
+        
         // ===== INIT =====
         // Auto-load on page load using DOMContentLoaded
         document.addEventListener('DOMContentLoaded', function() {
             loadState(); // Load saved state from localStorage (includes players array)
             render(); // Trigger render to display the loaded data
+            updateMuteButton(); // Update mute button appearance
         });
     </script>
 </body>
